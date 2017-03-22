@@ -35,6 +35,7 @@ THE POSSIBILITY OF SUCH DAMAGE.
 #include "coreneuron/nrniv/nrniv_decl.h"
 #include "coreneuron/nrnoc/nrnoc_decl.h"
 #include "coreneuron/nrniv/vrecitem.h"
+#include "coreneuron/nrniv/multisend.h"
 #include "coreneuron/utils/sdprintf.h"
 #include "coreneuron/nrniv/nrn_assert.h"
 #include "coreneuron/nrniv/nrnmutdec.h"
@@ -103,7 +104,7 @@ THE POSSIBILITY OF SUCH DAMAGE.
 // tvec
 //
 // The critical issue requiring careful attention is that a coreneuron
-// process reads many bluron thread files with a result that, although
+// process reads many coreneuron thread files with a result that, although
 // the conceptual
 // total n_pre is the sum of all the n_presyn from each thread as is the
 // total number of output_gid, the number of InputPreSyn instances must
@@ -255,7 +256,7 @@ void read_phase1(data_reader& F, int imult, NrnThread& nt) {
     nt.netcons = new NetCon[nt.n_netcon + nrn_setup_extracon];
     nt.presyns_helper = (PreSynHelper*)ecalloc(nt.n_presyn, sizeof(PreSynHelper));
 
-    /// Checkpoint in bluron is defined for both phase 1 and phase 2 since they are written together
+    /// Checkpoint in coreneuron is defined for both phase 1 and phase 2 since they are written together
     /// output_gid has all of output PreSyns, netcon_srcgid is created for NetCons which might be
     /// 10k times more than output_gid.
     int* output_gid = F.read_array<int>(nt.n_presyn);
@@ -500,7 +501,14 @@ void determine_inputpresyn() {
         offset += psi->nc_cnt_;
         psi->nc_cnt_ = 0;
     }
+
     inputpresyn_.clear();
+
+    // with gid to InputPreSyn and PreSyn maps we can setup the multisend
+    // target lists.
+    if (use_multisend_) {
+        nrn_multisend_setup();
+    }
 
     // fill the netcon_in_presyn_order and recompute nc_cnt_
     // note that not all netcon_in_presyn will be filled if there are netcon
@@ -905,6 +913,8 @@ void nrn_cleanup() {
         free(nt->_ml_list);
     }
 
+    nrn_multisend_cleanup();
+
     netcon_in_presyn_order_.clear();
 
     nrn_threads_free();
@@ -920,7 +930,7 @@ void read_phase2(data_reader& F, int imult, NrnThread& nt) {
     nt.end = F.read_int();
     int nmech = F.read_int();
 
-    /// Checkpoint in bluron is defined for both phase 1 and phase 2 since they are written together
+    /// Checkpoint in coreneuron is defined for both phase 1 and phase 2 since they are written together
     // printf("ncell=%d end=%d nmech=%d\n", nt.ncell, nt.end, nmech);
     // printf("nart=%d\n", nart);
     NrnThreadMembList* tml_last = NULL;
